@@ -15,7 +15,7 @@ import copy
 
 import flwr as fl
 import torch
-
+from pathlib import Path
 import utils
 import math
 import warnings
@@ -1104,8 +1104,13 @@ def main():
         model = utils.Net()
         #model = utils.CNN_MNIST()
         ct = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = "cifar10results/cifar10_iid_" + str(ct) + ".txt"
-        with open(filename, "w") as f:
+        directory = Path("results/cifar10")
+        # Create the directory, including parent directories if needed
+        directory.mkdir(parents=True, exist_ok=True)
+        print(f"Directory '{directory}' created successfully.")
+        filename = "cifar10_iid_" + str(ct) + ".txt"
+        filepath = directory / filename
+        with open(filepath, "w") as f:
             print("Running cifar test", file=f)
     elif(args.data == "fmnist"):
         model = utils.CNN_MNIST()
