@@ -1100,6 +1100,15 @@ def main():
     cluster_algorithm = args.cluster
     selectedDataset = args.data
     
+    defense = 'nodefense_'
+    if V3 and lofOnly:
+        defense = 'bodlof_'
+    elif lofHybrid:
+        defense = 'bodhybrid_'
+    elif UTDDetect:
+        defense = 'rlr_' # robust learning rate
+
+
     if(args.data == "cifar10"):
         model = utils.Net()
         #model = utils.CNN_MNIST()
@@ -1108,9 +1117,9 @@ def main():
         # Create the directory, including parent directories if needed
         directory.mkdir(parents=True, exist_ok=True)
         print(f"Directory '{directory}' created successfully.")
-        filename = "cifar10_iid_" + str(ct) + ".txt"
-        filepath = directory / filename
-        with open(filepath, "w") as f:
+        name = "cifar10_iid_" + defense + str(ct) + ".txt"
+        filename = directory / name
+        with open(filename, "w") as f:
             print("Running cifar test", file=f)
     elif(args.data == "fmnist"):
         model = utils.CNN_MNIST()
@@ -1142,6 +1151,7 @@ def main():
         initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
     )
     '''
+
     strategy = AggregateCustomMetricStrategy(
         min_fit_clients=num_agents,
         min_evaluate_clients=num_agents,
@@ -1154,6 +1164,7 @@ def main():
         initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
         
     )
+    
     # Start Flower server for four rounds of federated learning
     fl.server.start_server(
         server_address="10.100.116.10:8080",
