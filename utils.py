@@ -198,7 +198,8 @@ def distribute_data(dataset, num_agents=10, n_classes=10, class_per_agent=10):
 
     return dict_users
 
-def poison_dataset(dataset, selectedDataset, data_idxs=None, agent_idx=-1, poison_all=False):
+
+def poison_dataset(dataset, selectedDataset, data_idxs=None, agent_idx=-1, poison_all=False, pattern='plus'):
     #target of 5 is hard coded for now
     #print("POISONING {}".format(selectedDataset))
     all_idxs = (dataset.targets == 5).nonzero().flatten().tolist()
@@ -224,7 +225,7 @@ def poison_dataset(dataset, selectedDataset, data_idxs=None, agent_idx=-1, poiso
         #Plus pattern is hard coded for now
         #bd_img = add_pattern_bd(clean_img, selectedDataset, pattern_type='plus', agent_idx=agent_idx)
         #Set agent ID to -1 so we can test non-distributed cifar attack
-        bd_img = add_pattern_bd(clean_img, selectedDataset, pattern_type='plus', agent_idx=-1)
+        bd_img = add_pattern_bd(clean_img, selectedDataset, pattern_type=pattern, agent_idx=-1)
         if selectedDataset == 'fedemnist':
             dataset.inputs[idx] = torch.tensor(bd_img)
         else:
@@ -241,19 +242,39 @@ def add_pattern_bd(x, dataset='cifar10', pattern_type='square', agent_idx=-1):
 
     # if cifar is selected, we're doing a distributed backdoor attack (i.e., portions of trojan pattern is split between agents, only works for plus)
     if dataset == 'cifar10':
-        if pattern_type == 'plus':
+        if pattern_type == 'square':
+            # Create a square in the middle of the CIFAR-10 image (32x32)
+            start_idx = 10  # starting index
+            size = 12  # size of the square
+            for i in range(start_idx, start_idx + size):
+                for j in range(start_idx, start_idx + size):
+                    x[i, j] = 0  # Set pixel to black (0)
+
+        elif pattern_type == 'copyright':
+            # Add copyright pattern to CIFAR-10 image
+            trojan = cv2.imread('../watermark.png', cv2.IMREAD_GRAYSCALE)
+            trojan = cv2.bitwise_not(trojan)  # Invert the image
+            trojan = cv2.resize(trojan, dsize=(32, 32), interpolation=cv2.INTER_CUBIC)
+            x = np.minimum(x + trojan, 255)  # Add and ensure values don't exceed 255
+
+        elif pattern_type == 'apple':
+            # Add apple pattern to CIFAR-10 image
+            trojan = cv2.imread('../apple.png', cv2.IMREAD_GRAYSCALE)
+            trojan = cv2.bitwise_not(trojan)  # Invert the image
+            trojan = cv2.resize(trojan, dsize=(32, 32), interpolation=cv2.INTER_CUBIC)
+            x = np.minimum(x + trojan, 255)  # Add and ensure values don't exceed 255
+
+        elif pattern_type == 'plus':
+            # Add a plus pattern (cross) in the CIFAR-10 image
             start_idx = 5
             size = 6
             if agent_idx == -1:
-                # vertical line
-                for d in range(0, 3):
-                    for i in range(start_idx, start_idx+size+1):
-                        #print("changing {} to 0".format(str(x[i, start_idx][d])))
-                        x[i, start_idx][d] = 0
-                # horizontal line
-                for d in range(0, 3):
-                    for i in range(start_idx-size//2, start_idx+size//2 + 1):
-                        x[start_idx+size//2, i][d] = 0
+                # Full cross pattern
+                for d in range(0, 3):  # RGB channels
+                    for i in range(start_idx, start_idx + size + 1):  # Vertical line
+                        x[i, start_idx, d] = 0
+                    for i in range(start_idx - size // 2, start_idx + size // 2 + 1):  # Horizontal line
+                        x[start_idx + size // 2, i, d] = 0
             else:# DBA attack
                 #upper part of vertical
                 if agent_idx == 0:

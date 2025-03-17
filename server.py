@@ -1060,6 +1060,13 @@ def main():
         required=False,
         help="Toggle to enable detection by percentile with RLR"
     )
+    parser.add_argument(
+        "--pattern",
+        type=str,
+        default="plus",
+        required=False,
+        help="Used to select trojan pattern"
+    )
     args = parser.parse_args()
 
     global selectedDataset 
@@ -1096,6 +1103,7 @@ def main():
     kmeansHybrid = args.kmeansHybrid
     percentile = args.percentile
     percentileHybrid = args.percentileHybrid
+    pattern = args.pattern
 
     cluster_algorithm = args.cluster
     selectedDataset = args.data
@@ -1117,7 +1125,7 @@ def main():
         # Create the directory, including parent directories if needed
         directory.mkdir(parents=True, exist_ok=True)
         print(f"Directory '{directory}' created successfully.")
-        name = "cifar10_iid_" + defense + str(ct) + ".txt"
+        name = "cifar10_iid_" + defense + pattern + str(ct) + ".txt"
         filename = directory / name
         with open(filename, "w") as f:
             print("Running cifar test", file=f)
@@ -1168,7 +1176,7 @@ def main():
     # Start Flower server for four rounds of federated learning
     fl.server.start_server(
         server_address="10.100.116.10:8080",
-        config=fl.server.ServerConfig(num_rounds=100 if selectedDataset == "fedemnist" else 10),
+        config=fl.server.ServerConfig(num_rounds=100 if selectedDataset == "fedemnist" else 200),
         strategy=strategy,
     )
 

@@ -259,6 +259,14 @@ def main() -> None:
         help="Used to select GPU for a given client"
     )
 
+    parser.add_argument(
+        "--pattern",
+        type=str,
+        default="plus",
+        required=False,
+        help="Used to select trojan pattern"
+    )
+
     args = parser.parse_args()
     
     print ("device=", args.device)
@@ -278,6 +286,7 @@ def main() -> None:
         global clientID
         selectedDataset = args.data
         clientID = args.clientID
+        selectedPattern = args.pattern
 
         print("Client ID {}".format(args.clientID))
         #trainset, testset = utils.load_partition(args.partition)
@@ -299,7 +308,7 @@ def main() -> None:
         if args.poison:
             print(".........poisoning the data")
             #idxs = (trainset.targets == 5).nonzero().flatten().tolist()
-            utils.poison_dataset(trainset.dataset, selectedDataset, user_groups[args.clientID], agent_idx=args.clientID)
+            utils.poison_dataset(trainset.dataset, selectedDataset, user_groups[args.clientID], agent_idx=args.clientID, pattern=selectedPattern)
 
         if args.toy:
             trainset = torch.utils.data.Subset(trainset, range(10))
