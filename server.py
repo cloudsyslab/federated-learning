@@ -5,8 +5,9 @@ import argparse
 import pandas as pd
 from torch.utils.data import DataLoader
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
-from flwr.common import Metrics, Scalar, EvaluateRes, FitRes, parameters_to_ndarrays, ndarrays_to_parameters, NDArray, NDArrays
+from flwr.common import Metrics, Scalar, EvaluateRes, FitRes, parameters_to_ndarrays, ndarrays_to_parameters, NDArray, NDArrays, Parameters
 from flwr.server.client_proxy import ClientProxy
+from flwr.server.client_manager import ClientManager
 from utils import H5Dataset
 import datetime
 
@@ -71,7 +72,7 @@ def evaluate_config(server_round: int):
     return {"val_steps": val_steps}
 
 
-def get_evaluate_fn(model: torch.nn.Module, toy: bool, data):
+def get_evaluate_fn(model: torch.nn.Module, toy: bool, data, selectedPattern):
     """Return an evaluation function for server-side evaluation."""
 
     # Load data and model here to avoid the overhead of doing it in `evaluate` itself
@@ -90,11 +91,13 @@ def get_evaluate_fn(model: torch.nn.Module, toy: bool, data):
         if(selectedDataset == "cifar10"):
             idxs = (testset.targets == 5).nonzero().flatten().tolist()
             poisoned_valset = utils.DatasetSplit(copy.deepcopy(testset), idxs)
-            utils.poison_dataset(poisoned_valset.dataset, "cifar10", idxs, poison_all=True)
+            #utils.poison_dataset(poisoned_valset.dataset, "cifar10", idxs, poison_all=True)
+            utils.poison_dataset(poisoned_valset.dataset, "cifar10", idxs, poison_all=True, pattern=selectedPattern)
         elif(selectedDataset == "fmnist"):
             idxs = (testset.targets == 5).nonzero().flatten().tolist()
             poisoned_valset = utils.DatasetSplit(copy.deepcopy(testset), idxs)
-            utils.poison_dataset(poisoned_valset.dataset, "fmnist", idxs, poison_all=True)
+            #utils.poison_dataset(poisoned_valset.dataset, "fmnist", idxs, poison_all=True)
+            utils.poison_dataset(poisoned_valset.dataset, "fmnist", idxs, poison_all=True, pattern=selectedPattern)
         elif(selectedDataset == "fedemnist"):
             #poisoned_valset = copy.deepcopy(testset)
             idxs = (testset.targets == 5).nonzero().flatten().tolist()
@@ -145,7 +148,17 @@ def get_evaluate_fn(model: torch.nn.Module, toy: bool, data):
 
     return evaluate
 
-class AggregateCustomMetricStrategy(fl.server.strategy.FedAvgM):
+class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
+    def __init__(self, *args, **kwargs):
+        self.server_learning_rate = kwargs.pop('server_learning_rate', 0.01)
+        super().__init__(*args, **kwargs)
+
+    def initialize_parameters(
+        self, client_manager: ClientManager
+    ) -> Optional[Parameters]:
+        """Initialize global model parameters."""
+        return self.initial_parameters
+
     def aggregate_fit(
         self,
         server_round: int,
@@ -161,7 +174,7 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvgM):
         #        print(metric)
 
         # Call aggregate_evaluate from base class (FedAvg) to aggregate loss and metrics
-        aggregated_parameters, aggregated_metrics = super().aggregate_fit(server_round, results, failures)
+        #aggregated_parameters, aggregated_metrics = super().aggregate_fit(server_round, results, failures)
 
         if(selectedDataset == "cifar10"):
             with open(filename, "a") as f:
@@ -336,6 +349,28 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvgM):
             df = pd.DataFrame(update_dict)
             K = len(df.columns)
             detection_slice = df.tail(10).reset_index(drop=True)
+            
+            # Only needed when analyzing per layer biases..
+            '''
+            if selectedDataset in ['fmnist','fedemnist']:
+                detection_slice = pd.concat([
+                   df.iloc[288:288+32],   #layer 1 bias 
+                   df.iloc[18752:18752+64],  # layer 2 bias
+                   df.iloc[1198464:1198464+128], # layer 3 bias
+                   df.iloc[1199872:1199872+10] # layer 4 bias
+                ]).reset_index(drop=True)
+            else:
+                detection_slice = pd.concat([
+                   df.iloc[1728:1728+64],   #layer 1 bias
+                   df.iloc[75520:75520+128],  # layer 2 bias
+                   df.iloc[370560:370560+256], # layer 3 bias
+                   df.iloc[501888:501888+128], # layer 4 bias
+                   df.iloc[534784:534784+256], # layer 5 bias
+                   df.iloc[537600:537600+10] # layer 6 bias
+                ]).reset_index(drop=True)
+
+            #detection_slice.to_csv(f'results/allbiases_{server_round}.csv', index=False)    
+            '''
             #used for graphing clusters
             #saved_csv = detection_slice.to_csv('10_rounds_tests/testsForPaperGraphs/fmnist/fmnist_Test2_Round{}_client_models.csv'.format(str(server_round)), index=False)
             #for column in detection_slice.columns:
@@ -408,7 +443,7 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvgM):
             selectedClients = []
             for proxy, client in results:
                 selectedClients.append(client.metrics["clientID"])
-                if(client.metrics["clientID"] >= 338):
+                if(client.metrics["clientID"] > 0):
                     #print("Client {} is not marked as malicious".format(client.metrics["clientID"]))
                     new_results.append((proxy, client))
             
@@ -693,8 +728,16 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvgM):
             K = len(df.columns)
             #full_model = df.to_csv('Round1_fmnist_full_client_models.csv', index=False)
             detection_slice = df.tail(10).reset_index(drop=True)
-            predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset)
-            
+            # DEBUG: logging bias data
+            # detection_slice.to_csv(f'results/allbiases_{server_round}.csv', index=False)
+            '''
+            if server_round <= 100:
+                predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset, 80, 50, 50, 50)
+            else:
+                predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset, 80, 20, 20, 20)
+            '''
+            predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset, 80, 50, 50, 50)
+
             false_positives = []
             true_positives = []
             false_negatives = []
@@ -723,7 +766,7 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvgM):
             new_results = []
             for proxy, client in results:
                 if(client.metrics["clientID"] not in predicted_malicious):
-                    #print("Client {} is not marked as malicious".format(client.metrics["clientID"]))
+                    print("Client {} is not marked as malicious".format(client.metrics["clientID"]))
                     new_results.append((proxy, client))
 
             #Remove the clients that were filtered out from the update dictionary
@@ -736,8 +779,12 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvgM):
             newClientIDs = []
             for proxy, client in new_results:
                 newClientIDs.append(client.metrics["clientID"])
+            
+            if len(new_results) > 0:
+                results = new_results
+            else:
+                return None, {}
 
-            results = new_results
 
         if(percentileHybrid):
             df = pd.DataFrame(update_dict)
@@ -793,9 +840,11 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvgM):
             lr_vector = compute_robustLR(new_update_dict, len(new_update_dict.keys())*.25)
             print("LR vector based on kmeans hybrid method:")
             print(lr_vector)
-
-            results = new_results
-
+            if len(new_results) > 0:
+                results = new_results
+            else:
+                return None, {}
+         
         #UTD RLR method
         if UTDDetect:
             print("RUNNING UTD DETECTION")
@@ -808,6 +857,7 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvgM):
             lr_vector = compute_robustLR(update_dict, 8)
             print(lr_vector)
         
+
         #interpretation of the aggregate.py flower code
         weights_results = [
             (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
@@ -841,8 +891,33 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvgM):
         else:
             finalParams = primeParams
         
+
         #store the final weights back into the model
         vector_to_parameters(finalParams, model.parameters())
+        #retrieve the final weights (this converts the params from the UTD format to flower format)
+        finalParams = utils.get_model_params(model)
+         
+        assert (
+                self.initial_parameters is not None
+        ), "When using server-side optimization, model needs to be initialized." 
+        # Convert current global parameters to NumPy arrays
+        global_params = parameters_to_ndarrays(self.initial_parameters)
+        
+        
+        # Update global parameters by adding aggregated delta
+        new_global_params = [
+            global_layer + self.server_learning_rate * delta_layer
+            for global_layer, delta_layer in zip(global_params, finalParams)
+        ]
+
+        new_parameters = ndarrays_to_parameters(new_global_params)
+        # Update current weights
+        self.initial_parameters = new_parameters
+        #store the final weights back into the model
+        params_dict = zip(model.state_dict().keys(), parameters_to_ndarrays(new_parameters))
+        state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+        model.load_state_dict(state_dict, strict=False)
+        
         #retrieve the final weights (this converts the params from the UTD format to flower format)
         weights_prime = utils.get_model_params(model)
 
@@ -1103,19 +1178,20 @@ def main():
     kmeansHybrid = args.kmeansHybrid
     percentile = args.percentile
     percentileHybrid = args.percentileHybrid
-    pattern = args.pattern
+    selectedPattern = args.pattern
 
     cluster_algorithm = args.cluster
     selectedDataset = args.data
     
     defense = 'nodefense_'
-    if V3 and lofOnly:
-        defense = 'bodlof_'
+    if percentile:
+        defense = 'bod_'
     elif lofHybrid:
         defense = 'bodhybrid_'
     elif UTDDetect:
         defense = 'rlr_' # robust learning rate
-
+    elif perfect:
+        defense = 'oracle_'
 
     if(args.data == "cifar10"):
         model = utils.Net()
@@ -1125,14 +1201,19 @@ def main():
         # Create the directory, including parent directories if needed
         directory.mkdir(parents=True, exist_ok=True)
         print(f"Directory '{directory}' created successfully.")
-        name = "cifar10_iid_" + defense + pattern + str(ct) + ".txt"
+        name = "cifar10_iid_" + defense + selectedPattern + str(ct) + ".txt"
         filename = directory / name
         with open(filename, "w") as f:
             print("Running cifar test", file=f)
     elif(args.data == "fmnist"):
         model = utils.CNN_MNIST()
         ct = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        filename = "fmnist/fmnist_50_percentile_poison_50_test3_10_clients_" + str(ct) + ".txt"
+        directory = Path("results/fmnist")
+        # Create the directory, including parent directories if needed
+        directory.mkdir(parents=True, exist_ok=True)
+        print(f"Directory '{directory}' created successfully.")
+        name = "fmnist_iid_" + defense + selectedPattern + str(ct) + ".txt"
+        filename = directory / name
         with open(filename, "w") as f:
             print("Running fmnist test", file=f)
     else:
@@ -1164,19 +1245,18 @@ def main():
         min_fit_clients=num_agents,
         min_evaluate_clients=num_agents,
         min_available_clients=num_agents,
-        evaluate_fn=get_evaluate_fn(model, args.toy, args.data),
+        evaluate_fn=get_evaluate_fn(model, args.toy, args.data, selectedPattern),
         on_fit_config_fn=get_on_fit_config_fn(), #fit_config,
         on_evaluate_config_fn=evaluate_config,
-        server_learning_rate = 1.0,
-        server_momentum = 0,
+        server_learning_rate = 1,
+        #server_momentum = 0,
         initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
-        
     )
     
     # Start Flower server for four rounds of federated learning
     fl.server.start_server(
         server_address="10.100.116.10:8080",
-        config=fl.server.ServerConfig(num_rounds=100 if selectedDataset == "fedemnist" else 200),
+        config=fl.server.ServerConfig(num_rounds=200),
         strategy=strategy,
     )
 

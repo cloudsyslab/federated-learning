@@ -252,19 +252,32 @@ def add_pattern_bd(x, dataset='cifar10', pattern_type='square', agent_idx=-1):
 
         elif pattern_type == 'copyright':
             # Add copyright pattern to CIFAR-10 image
-            trojan = cv2.imread('../watermark.png', cv2.IMREAD_GRAYSCALE)
+            trojan = cv2.imread('dataset/watermark.png', cv2.IMREAD_GRAYSCALE)
             trojan = cv2.bitwise_not(trojan)  # Invert the image
             trojan = cv2.resize(trojan, dsize=(32, 32), interpolation=cv2.INTER_CUBIC)
-            x = np.minimum(x + trojan, 255)  # Add and ensure values don't exceed 255
-
+            #x = np.minimum(x + trojan, 255)  # Add and ensure values don't exceed 255
+            # Convert the grayscale watermark to a 3-channel image
+            trojan_color = cv2.cvtColor(trojan, cv2.COLOR_GRAY2BGR)
+            x = np.minimum(x + trojan_color, 255)
         elif pattern_type == 'apple':
             # Add apple pattern to CIFAR-10 image
-            trojan = cv2.imread('../apple.png', cv2.IMREAD_GRAYSCALE)
+            trojan = cv2.imread('dataset/apple.png', cv2.IMREAD_GRAYSCALE)
             trojan = cv2.bitwise_not(trojan)  # Invert the image
             trojan = cv2.resize(trojan, dsize=(32, 32), interpolation=cv2.INTER_CUBIC)
             x = np.minimum(x + trojan, 255)  # Add and ensure values don't exceed 255
 
         elif pattern_type == 'plus':
+            start_idx = 5
+            size = 5
+            # vertical line
+            for i in range(start_idx, start_idx+size):
+                x[i, start_idx] = 255
+
+            # horizontal line
+            for i in range(start_idx-size//2, start_idx+size//2 + 1):
+                x[start_idx+size//2, i] = 255
+
+        elif pattern_type == 'plus_distributed':
             # Add a plus pattern (cross) in the CIFAR-10 image
             start_idx = 5
             size = 6
@@ -307,13 +320,13 @@ def add_pattern_bd(x, dataset='cifar10', pattern_type='square', agent_idx=-1):
                     x[i, j] = 255
 
         elif pattern_type == 'copyright':
-            trojan = cv2.imread('../watermark.png', cv2.IMREAD_GRAYSCALE)
+            trojan = cv2.imread('dataset/watermark.png', cv2.IMREAD_GRAYSCALE)
             trojan = cv2.bitwise_not(trojan)
             trojan = cv2.resize(trojan, dsize=(28, 28), interpolation=cv2.INTER_CUBIC)
             x = x + trojan
 
         elif pattern_type == 'apple':
-            trojan = cv2.imread('../apple.png', cv2.IMREAD_GRAYSCALE)
+            trojan = cv2.imread('dataset/apple.png', cv2.IMREAD_GRAYSCALE)
             trojan = cv2.bitwise_not(trojan)
             trojan = cv2.resize(trojan, dsize=(28, 28), interpolation=cv2.INTER_CUBIC)
             x = x + trojan

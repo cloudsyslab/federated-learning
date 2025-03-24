@@ -106,18 +106,10 @@ class CifarClient(fl.client.NumPyClient):
         #plt.show()
 
         #training
-        #parameters_old = utils.get_model_params(model)
-
-        #test_params = parameters_old - parameters_old
-        
-        #parameters_old = parameters_to_ndarrays(utils.get_model_params(model))
-        
-        #This is the format we want
-        #parameters_test = parameters_to_vector(model.parameters()).detach()
-
+        parameters_old = utils.get_model_params(model)
         results = utils.train(model, trainLoader, valLoader, poisoned_val_loader, epochs, self.device)
-        parameters_prime = utils.get_model_params(model)
-        
+        parameters_new = utils.get_model_params(model)
+        parameters_delta = [new - old for new, old in zip(parameters_new, parameters_old)]
         #print("Prime type:")
         #print(type(parameters_prime))
         #print(parameters_prime)
@@ -150,9 +142,7 @@ class CifarClient(fl.client.NumPyClient):
         #add the ID of the client to be sent back to the server
         results["clientID"] = clientID_local
 
-        #return test_params, num_examples_train, results
-        #return finalParams, num_examples_train, results
-        return parameters_prime, num_examples_train, results
+        return parameters_delta, num_examples_train, results
 
     def evaluate(self, parameters, config):
         """Evaluate parameters on the locally held test set."""
