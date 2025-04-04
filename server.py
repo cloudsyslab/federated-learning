@@ -148,8 +148,13 @@ def get_evaluate_fn(model: torch.nn.Module, toy: bool, data, selectedPattern):
 
     return evaluate
 
-class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
-    def __init__(self, *args, **kwargs):
+class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg): 
+    def __init__(self, *args, p1, p2, p3, p4, **kwargs):
+        self.p1 = p1
+        self.p2 = p2
+        self.p3 = p3
+        self.p4 = p4 
+
         self.server_learning_rate = kwargs.pop('server_learning_rate', 0.01)
         super().__init__(*args, **kwargs)
 
@@ -736,7 +741,7 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
             else:
                 predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset, 80, 20, 20, 20)
             '''
-            predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset, 80, 50, 50, 50)
+            predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset,self.p1,self.p2,self.p3,self.p4)
 
             false_positives = []
             true_positives = []
@@ -950,10 +955,14 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
             with open(filename, "a") as f:
                 print("Round {} aggregated training accuracy: {}".format(str(server_round), aggregated_accuracy), file=f)
                 print("Round {} aggregated poison accuracy: {}".format(str(server_round), aggregated_poison_accuracy), file=f)
+                print(f"Using percentile thresholds: p1={self.p1}, p2={self.p2}, p3={self.p3}, p4={self.p4}", file=f)
+
         else:
             with open(filename, "a") as f:
                 print("Round {} aggregated training accuracy: {}".format(str(server_round), aggregated_accuracy), file=f)
                 print("Round {} aggregated poison accuracy: {}".format(str(server_round), aggregated_poison_accuracy), file=f)
+                print(f"Using percentile thresholds: p1={self.p1}, p2={self.p2}, p3={self.p3}, p4={self.p4}", file=f)
+
 
         # Return aggregated model paramters and other metrics (i.e., aggregated accuracy)
         return ndarrays_to_parameters(weights_prime), {"accuracy": aggregated_accuracy}
@@ -1001,6 +1010,8 @@ def compute_robustLR(agent_updates_dict, threshold):
         return sm_of_signs
 
 def main():
+
+    p1,p2,p3,p4 = 25,75,75,75
     """Load model for
     1. server-side parameter initialization
     2. server-side parameter evaluation
@@ -1251,15 +1262,17 @@ def main():
         server_learning_rate = 1,
         #server_momentum = 0,
         initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
+        p1=p1,p2=p2,p3=p3,p4=p4
     )
     
     # Start Flower server for four rounds of federated learning
     fl.server.start_server(
         server_address="10.100.116.10:8080",
-        config=fl.server.ServerConfig(num_rounds=200),
+        config=fl.server.ServerConfig(num_rounds=10),
         strategy=strategy,
     )
 
 
 if __name__ == "__main__":
     main()
+
