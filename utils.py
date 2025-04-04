@@ -342,6 +342,42 @@ def add_pattern_bd(x, dataset='cifar10', pattern_type='square', agent_idx=-1):
             for i in range(start_idx-size//2, start_idx+size//2 + 1):
                 x[start_idx+size//2, i] = 255
 
+        elif pattern_type == 'plus_distributed':
+            # Add a plus pattern (cross) in the CIFAR-10 image
+            start_idx = 5
+            size = 6
+            if agent_idx == -1:
+                # Full cross pattern
+                for d in range(0, 3):  # RGB channels
+                    for i in range(start_idx, start_idx + size + 1):  # Vertical line
+                        x[i, start_idx, d] = 0
+                    for i in range(start_idx - size // 2, start_idx + size // 2 + 1):  # Horizontal line
+                        x[start_idx + size // 2, i, d] = 0
+            else:# DBA attack
+                #upper part of vertical
+                if agent_idx == 0:
+                    for d in range(0, 3):
+                        for i in range(start_idx, start_idx+(size//2)+1):
+                            x[i, start_idx][d] = 0
+
+                #lower part of vertical
+                elif agent_idx == 1:
+                    for d in range(0, 3):
+                        for i in range(start_idx+(size//2)+1, start_idx+size+1):
+                            x[i, start_idx][d] = 0
+
+                #left-part of horizontal
+                elif agent_idx == 2:
+                    for d in range(0, 3):
+                        for i in range(start_idx-size//2, start_idx+size//4 + 1):
+                            x[start_idx+size//2, i][d] = 0
+
+                #right-part of horizontal
+                elif agent_idx == 3:
+                    for d in range(0, 3):
+                        for i in range(start_idx-size//4+1, start_idx+size//2 + 1):
+                            x[start_idx+size//2, i][d] = 0
+
     elif dataset == 'fedemnist':
         if pattern_type == 'square':
             for i in range(21, 26):
