@@ -6,14 +6,14 @@ cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/
 python -c "from torchvision.datasets import CIFAR10; CIFAR10('./dataset', download=True)"
 
 # Check if the required arguments are provided
-if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <pattern> <data> <defense technique>"
+if [ "$#" -ne 2 ]; then
+    echo "Usage: $0 <data> <defense technique>"
     exit 1
 fi
 
-pattern=$1
-data=$2
-defense=$3
+pattern="plus_distributed"
+data=$1
+defense=$2
 
 # Check if the pattern and data variables are not empty
 if [ -z "$pattern" ] || [ -z "$data" ] || [ -z "$defense" ]; then
@@ -30,33 +30,38 @@ elif [[ "$defense" == "nodefense" ]]; then
 elif [[ "$defense" == "rlr" ]]; then
     python server.py --data "$data" --pattern "$pattern" --UTDDetect True &
 elif [[ "$defense" == "oracle" ]]; then
-    python server.py --data "$data" --pattern "$pattern" --perfect True &
-else
+    python server.py --data "$data" --pattern "$pattern" --perfect True &else
     echo "incorrect option"
     exit 1
 fi
 
 sleep 10
 
-echo "Starting client 0 with poisoning"
-python client.py --clientID 0 --data "$data" --use_cuda True --device "cuda:4" --poison POISON --pattern "$pattern" &
-
-
-for i in `seq 1 3`; do
-    echo "Starting client $i"
-    python client.py --clientID $i --data "$data" --use_cuda True --device "cuda:0" &
+#Start the poisoned clients
+for i in `seq 0 3`; do
+    echo "Starting poison client $i"
+    python client.py --poison POISON --pattern "$pattern" --clientID $i --data "$data" --use_cuda True --device "cuda:4" &
 done
 
-
-for i in `seq 4 6`; do
+#Distrubute the remaining clients accross the 4 GPUs
+for i in `seq 4 9`; do
     echo "Starting client $i"
-    python client.py --clientID $i --data "$data" --use_cuda True --device "cuda:1"  &
+    python client.py --clientID $i --use_cuda True --device "cuda:0" --data "$data" &
 done
 
-
-for i in `seq 7 9`; do
+for i in `seq 10 19`; do
     echo "Starting client $i"
-    python client.py --clientID $i --data "$data" --use_cuda True --device "cuda:2" &
+    python client.py --clientID $i --use_cuda True --device "cuda:1" --data "$data" &
+done
+
+for i in `seq 20 29`; do
+    echo "Starting client $i"
+    python client.py --clientID $i --use_cuda True --device "cuda:2" --data "$data" &
+done
+
+for i in `seq 30 39`; do
+    echo "Starting client $i"
+    python client.py --clientID $i --use_cuda True --device "cuda:3" --data "$data" &
 done
 
 # Enable CTRL+C to stop all background processes

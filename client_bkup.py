@@ -60,18 +60,18 @@ class CifarClient(fl.client.NumPyClient):
 
         clientID_local = clientID
         #print("The selected dataset is {}".format(selectedDataset))
-        if(selectedDataset == "fedmnist"):
+        if(selectedDataset == "fedemnist"):
             id_list = config['id_list']
             id_list = id_list.split(" ")
             id_list = id_list[1:]
             print(id_list)
             print("Using {} as my ID".format(id_list[clientID]))
-            self.trainset = torch.load(f'./dataset/Fed_MNIST/user_trainsets/user_{id_list[clientID]}_trainset.pt')
+            self.trainset = torch.load(f'./dataset/Fed_EMNIST/user_trainsets/user_trainsets/user_{id_list[clientID]}_trainset.pt')
             if(int(id_list[clientID]) < 338):
                 print("POISONING MY DATA")
                 utils.poison_dataset(self.trainset, selectedDataset, None, id_list[clientID])
             clientID_local = int(id_list[clientID])
-        
+
         #valset = torch.utils.data.Subset(self.trainset, range(0, n_valset))
         valset = self.testset
         #trainset = torch.utils.data.Subset(
@@ -106,10 +106,18 @@ class CifarClient(fl.client.NumPyClient):
         #plt.show()
 
         #training
-        parameters_old = utils.get_model_params(model)
+        #parameters_old = utils.get_model_params(model)
+
+        #test_params = parameters_old - parameters_old
+        
+        #parameters_old = parameters_to_ndarrays(utils.get_model_params(model))
+        
+        #This is the format we want
+        #parameters_test = parameters_to_vector(model.parameters()).detach()
+
         results = utils.train(model, trainLoader, valLoader, poisoned_val_loader, epochs, self.device)
-        parameters_new = utils.get_model_params(model)
-        parameters_delta = [new - old for new, old in zip(parameters_new, parameters_old)]
+        parameters_prime = utils.get_model_params(model)
+        
         #print("Prime type:")
         #print(type(parameters_prime))
         #print(parameters_prime)
@@ -142,7 +150,9 @@ class CifarClient(fl.client.NumPyClient):
         #add the ID of the client to be sent back to the server
         results["clientID"] = clientID_local
 
-        return parameters_delta, num_examples_train, results
+        #return test_params, num_examples_train, results
+        #return finalParams, num_examples_train, results
+        return parameters_prime, num_examples_train, results
 
     def evaluate(self, parameters, config):
         """Evaluate parameters on the locally held test set."""
@@ -283,25 +293,19 @@ def main() -> None:
         trainset, testset, num_examples = utils.load_data(args.data)
 
         #split the dataset into slices and store the slices in user_groups
-        if args.data != "fedmnist":
-            if "distributed" not in args.pattern:
-                user_groups = utils.distribute_data(trainset)
-            else:
-                user_groups = utils.distribute_data(trainset, 40, 10, 10)
-
+        if(args.data != "fedemnist"):
+            user_groups = utils.distribute_data(trainset)
         #print(str(user_groups))
-        #DEBUG: distributed backdoor
-        if len(user_groups[args.clientID]) == 0:
-            print ('DEBUG:..............................\n', args.clientID)
-        
+
         #Use the client's ID to select which slice of the data to use
-        if(args.data != "fedmnist"):
+        if(args.data != "fedemnist"):
             trainset = utils.DatasetSplit(trainset, user_groups[args.clientID])
-        else: # fedmnist is handled differently. 
-            trainset = torch.load(f'./dataset/Fed_MNIST/user_trainsets/user_{clientID}_trainset.pt')
-        
+        #fedemnist is handled differently
+        else:
+            trainset = torch.load(f'./dataset/Fed_EMNIST/user_trainsets/user_trainsets/user_{clientID}_trainset.pt')
+
         #Poison the data if the poison option is selected
-        if args.poison and args.data != "fedmnist":
+        if args.poison:
             print(".........poisoning the data")
             #idxs = (trainset.targets == 5).nonzero().flatten().tolist()
             utils.poison_dataset(trainset.dataset, selectedDataset, user_groups[args.clientID], agent_idx=args.clientID, pattern=selectedPattern)

@@ -5,9 +5,8 @@ import argparse
 import pandas as pd
 from torch.utils.data import DataLoader
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
-from flwr.common import Metrics, Scalar, EvaluateRes, FitRes, parameters_to_ndarrays, ndarrays_to_parameters, NDArray, NDArrays, Parameters
+from flwr.common import Metrics, Scalar, EvaluateRes, FitRes, parameters_to_ndarrays, ndarrays_to_parameters, NDArray, NDArrays
 from flwr.server.client_proxy import ClientProxy
-from flwr.server.client_manager import ClientManager
 from utils import H5Dataset
 import datetime
 
@@ -37,23 +36,23 @@ def get_on_fit_config_fn():
         local epoch, increase to two local epochs afterwards.
         """
         new_list = ""
-        if selectedDataset == "fedmnist":
+        if selectedDataset == "fedemnist":
             #id_list = np.random.choice(3383, math.floor(3383*.01), replace=False)
-            id_list = np.random.choice(3383, 33, replace=False)
+            id_list = np.random.choice(3383, 66, replace=False)
             #print("ID list:")
             #print(id_list)
             #The ID list has to be converted to a string because Flower won't except a list as a config option
             new_list = ""
             for item in id_list:
                 new_list += " " + str(item)
-        #new_list is used by the clients to select a dataslice during fedmnist test...it is not needed for cifar 
+        #new_list is used by the clients to select a dataslice during fedemnist test...it is not needed for cifar 
         else:
             new_list == ""
         #print(new_list)
         config = {
-            "batch_size": 64 if selectedDataset == "fedmnist" else 256,
+            "batch_size": 64 if selectedDataset == "fedemnist" else 256,
             "current_round": server_round,
-            "local_epochs": 10 if selectedDataset == "fedmnist" else 2,
+            "local_epochs": 10 if selectedDataset == "fedemnist" else 2,
             "id_list": new_list,
         }
         return config
@@ -98,11 +97,11 @@ def get_evaluate_fn(model: torch.nn.Module, toy: bool, data, selectedPattern):
             poisoned_valset = utils.DatasetSplit(copy.deepcopy(testset), idxs)
             #utils.poison_dataset(poisoned_valset.dataset, "fmnist", idxs, poison_all=True)
             utils.poison_dataset(poisoned_valset.dataset, "fmnist", idxs, poison_all=True, pattern=selectedPattern)
-        elif(selectedDataset == "fedmnist"):
+        elif(selectedDataset == "fedemnist"):
             #poisoned_valset = copy.deepcopy(testset)
             idxs = (testset.targets == 5).nonzero().flatten().tolist()
             poisoned_valset = utils.DatasetSplit(copy.deepcopy(testset), idxs)
-            utils.poison_dataset(poisoned_valset.dataset, selectedDataset, idxs, poison_all=True, pattern=selectedPattern)
+            utils.poison_dataset(poisoned_valset.dataset, selectedDataset, idxs, poison_all=True)
 
     if(selectedDataset == "cifar10" or selectedDataset == "fmnist"):
         valLoader = DataLoader(testset, batch_size=256, shuffle=False)
@@ -148,22 +147,7 @@ def get_evaluate_fn(model: torch.nn.Module, toy: bool, data, selectedPattern):
 
     return evaluate
 
-class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg): 
-    def __init__(self, *args, p1, p2, p3, p4, **kwargs):
-        self.p1 = p1
-        self.p2 = p2
-        self.p3 = p3
-        self.p4 = p4 
-
-        self.server_learning_rate = kwargs.pop('server_learning_rate', 0.01)
-        super().__init__(*args, **kwargs)
-
-    def initialize_parameters(
-        self, client_manager: ClientManager
-    ) -> Optional[Parameters]:
-        """Initialize global model parameters."""
-        return self.initial_parameters
-
+class AggregateCustomMetricStrategy(fl.server.strategy.FedAvgM):
     def aggregate_fit(
         self,
         server_round: int,
@@ -193,7 +177,7 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
         #number of cifar model parameters
         if selectedDataset == "cifar10":
             n_params = 537610
-        #number of fedmnist model parameters 
+        #number of fedemnist model parameters 
         else:
             n_params = 1199882
 
@@ -258,8 +242,8 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
                     print("The true positives: " + str(detection_metrics["true_positives"]), file=f)
                     print("The false negatives: " + str(detection_metrics["false_negatives"]), file=f)
                     print("The false positives: " + str(detection_metrics["false_positives"]), file=f)
-            #Since not all clients are used for fedmnist, we write all the selected clients for the round to the output file
-            elif(selectedDataset == "fedmnist"):
+            #Since not all clients are used for fedemnist, we write all the selected clients for the round to the output file
+            elif(selectedDataset == "fedemnist"):
                 with open(filename, "a") as f:
                     print("Using minmax", file=f)
                     print("All selected clients: {}".format(all_clients), file=f)
@@ -357,7 +341,7 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
             
             # Only needed when analyzing per layer biases..
             '''
-            if selectedDataset in ['fmnist','fedmnist']:
+            if selectedDataset in ['fmnist','fedemnist']:
                 detection_slice = pd.concat([
                    df.iloc[288:288+32],   #layer 1 bias 
                    df.iloc[18752:18752+64],  # layer 2 bias
@@ -734,24 +718,17 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
             #full_model = df.to_csv('Round1_fmnist_full_client_models.csv', index=False)
             detection_slice = df.tail(10).reset_index(drop=True)
             # DEBUG: logging bias data
-            # detection_slice.to_csv(f'results/allbiases_{server_round}.csv', index=False)
-            '''
+            #detection_slice.to_csv(f'results/allbiases_{server_round}.csv', index=False)
             if server_round <= 100:
                 predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset, 80, 50, 50, 50)
             else:
                 predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset, 80, 20, 20, 20)
-            '''
-            predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset,self.p1,self.p2,self.p3,self.p4)
 
             false_positives = []
             true_positives = []
             false_negatives = []
-            malicious_id = 1
-            if selectedDataset == 'fedmnist' or selectedPattern == 'plus_distributed':
-                malicious_id = 4
-
             for value in predicted_malicious:
-                if(value < malicious_id):
+                if(value < 1):
                     true_positives.append(value)
                 else:
                     false_positives.append(value)
@@ -863,18 +840,7 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
             else:
                 with open(filename, "a") as f:
                     print("RUNNING UTD DETECTION", file=f)
-            
-            # rlr thresholds based on UTD AAAI 2021 paper
-            if self.min_fit_clients == 40:
-                rlr_threshold = 8
-            elif self.min_fit_clients == 10:
-                rlr_threshold = 4
-            elif self.min_fit_clients == 33:
-                rlr_threshold = 7
-            else:
-                rlr_threshold = int(0.25*self.min_fit_clients)
-            
-            lr_vector = compute_robustLR(update_dict, rlr_threshold)
+            lr_vector = compute_robustLR(update_dict, 8)
             print(lr_vector)
         
 
@@ -911,33 +877,8 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
         else:
             finalParams = primeParams
         
-
         #store the final weights back into the model
         vector_to_parameters(finalParams, model.parameters())
-        #retrieve the final weights (this converts the params from the UTD format to flower format)
-        finalParams = utils.get_model_params(model)
-         
-        assert (
-                self.initial_parameters is not None
-        ), "When using server-side optimization, model needs to be initialized." 
-        # Convert current global parameters to NumPy arrays
-        global_params = parameters_to_ndarrays(self.initial_parameters)
-        
-        
-        # Update global parameters by adding aggregated delta
-        new_global_params = [
-            global_layer + self.server_learning_rate * delta_layer
-            for global_layer, delta_layer in zip(global_params, finalParams)
-        ]
-
-        new_parameters = ndarrays_to_parameters(new_global_params)
-        # Update current weights
-        self.initial_parameters = new_parameters
-        #store the final weights back into the model
-        params_dict = zip(model.state_dict().keys(), parameters_to_ndarrays(new_parameters))
-        state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-        model.load_state_dict(state_dict, strict=False)
-        
         #retrieve the final weights (this converts the params from the UTD format to flower format)
         weights_prime = utils.get_model_params(model)
 
@@ -970,14 +911,10 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
             with open(filename, "a") as f:
                 print("Round {} aggregated training accuracy: {}".format(str(server_round), aggregated_accuracy), file=f)
                 print("Round {} aggregated poison accuracy: {}".format(str(server_round), aggregated_poison_accuracy), file=f)
-                print(f"Using percentile thresholds: p1={self.p1}, p2={self.p2}, p3={self.p3}, p4={self.p4}", file=f)
-
         else:
             with open(filename, "a") as f:
                 print("Round {} aggregated training accuracy: {}".format(str(server_round), aggregated_accuracy), file=f)
                 print("Round {} aggregated poison accuracy: {}".format(str(server_round), aggregated_poison_accuracy), file=f)
-                print(f"Using percentile thresholds: p1={self.p1}, p2={self.p2}, p3={self.p3}, p4={self.p4}", file=f)
-
 
         # Return aggregated model paramters and other metrics (i.e., aggregated accuracy)
         return ndarrays_to_parameters(weights_prime), {"accuracy": aggregated_accuracy}
@@ -1025,8 +962,6 @@ def compute_robustLR(agent_updates_dict, threshold):
         return sm_of_signs
 
 def main():
-
-    p1,p2,p3,p4 = 25,75,75,75
     """Load model for
     1. server-side parameter initialization
     2. server-side parameter evaluation
@@ -1171,7 +1106,6 @@ def main():
     args = parser.parse_args()
 
     global selectedDataset 
-    global selectedPattern
     global UTDDetect
     global ourDetect
     global ourDetectV2
@@ -1246,30 +1180,16 @@ def main():
     else:
         model = utils.CNN_MNIST()
         ct = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        directory = Path("results/fedmnist")
-        # Create the directory, including parent directories if needed
-        directory.mkdir(parents=True, exist_ok=True)
-        print(f"Directory '{directory}' created successfully.")
-        name = "fedmnist_noniid_" + defense + selectedPattern + str(ct) + ".txt"
-        filename = directory / name
+        filename = "bestMethod/RLR_flower_poison_50_old_threshold_method_500_rounds_test1_fedemnist_33_clients_" + str(ct) + ".txt"
         with open(filename, "w") as f:
-            print("Running fedmnist test", file=f)
+            print("Running fedemnist test", file=f)
 
     print("NUMBER OF PARAMETERS: " + str(len(parameters_to_vector(model.parameters()))))
 
     model_parameters = [val.cpu().numpy() for _, val in model.state_dict().items()]
 
     # Create strategy
-    if selectedDataset == "fedmnist":
-        num_agents = 33
-    elif 'distributed' in selectedPattern: 
-        num_agents = 40
-        print ('num_agents :', num_agents)
-    else:
-        num_agents = 10
-    
-    # debugging with 2 agents
-    #num_agents = 2
+    num_agents = 33 if selectedDataset == "fedemnist" else 10
     '''
     strategy = fl.server.strategy.FedAvg(
         min_fit_clients=num_agents,
@@ -1289,20 +1209,19 @@ def main():
         evaluate_fn=get_evaluate_fn(model, args.toy, args.data, selectedPattern),
         on_fit_config_fn=get_on_fit_config_fn(), #fit_config,
         on_evaluate_config_fn=evaluate_config,
-        server_learning_rate = 1,
-        #server_momentum = 0,
+        server_learning_rate = 1.0,
+        server_momentum = 0,
         initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
-        p1=p1,p2=p2,p3=p3,p4=p4
+        
     )
     
     # Start Flower server for four rounds of federated learning
     fl.server.start_server(
         server_address="10.100.116.10:8080",
-        config=fl.server.ServerConfig(num_rounds=10),
+        config=fl.server.ServerConfig(num_rounds=200),
         strategy=strategy,
     )
 
 
 if __name__ == "__main__":
     main()
-
