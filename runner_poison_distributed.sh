@@ -24,13 +24,13 @@ fi
 
 # start server
 if [[ "$defense" == "ours" ]]; then
-    python server.py --data "$data" --pattern "$pattern" --percentile True &
+    python server.py --data "$data" --pattern "$pattern" --percentile True --num_agents 40 &
 elif [[ "$defense" == "nodefense" ]]; then
-    python server.py --data "$data" --pattern "$pattern" &
+    python server.py --data "$data" --pattern "$pattern" --num_agents 40 &
 elif [[ "$defense" == "rlr" ]]; then
-    python server.py --data "$data" --pattern "$pattern" --UTDDetect True &
+    python server.py --data "$data" --pattern "$pattern" --UTDDetect True --num_agents 40 &
 elif [[ "$defense" == "oracle" ]]; then
-    python server.py --data "$data" --pattern "$pattern" --perfect True &else
+    python server.py --data "$data" --pattern "$pattern" --perfect True --num_agents 40 &
     echo "incorrect option"
     exit 1
 fi
@@ -40,28 +40,29 @@ sleep 10
 #Start the poisoned clients
 for i in `seq 0 3`; do
     echo "Starting poison client $i"
-    python client.py --poison POISON --pattern "$pattern" --clientID $i --data "$data" --use_cuda True --device "cuda:4" &
+    python client.py --poison POISON --pattern "$pattern" --clientID $i --data "$data" --use_cuda True --device "cuda:4" --num_agents 40 &
 done
 
 #Distrubute the remaining clients accross the 4 GPUs
 for i in `seq 4 9`; do
     echo "Starting client $i"
-    python client.py --clientID $i --use_cuda True --device "cuda:0" --data "$data" &
+    python client.py --clientID $i --use_cuda True --device "cuda:0" --data "$data" --num_agents 40 &
 done
+
 
 for i in `seq 10 19`; do
     echo "Starting client $i"
-    python client.py --clientID $i --use_cuda True --device "cuda:1" --data "$data" &
+    python client.py --clientID $i --use_cuda True --device "cuda:1" --data "$data" --num_agents 40 &
 done
 
 for i in `seq 20 29`; do
     echo "Starting client $i"
-    python client.py --clientID $i --use_cuda True --device "cuda:2" --data "$data" &
+    python client.py --clientID $i --use_cuda True --device "cuda:2" --data "$data" --num_agents 40 &
 done
 
 for i in `seq 30 39`; do
     echo "Starting client $i"
-    python client.py --clientID $i --use_cuda True --device "cuda:3" --data "$data" &
+    python client.py --clientID $i --use_cuda True --device "cuda:3" --data "$data" --num_agents 40 &
 done
 
 # Enable CTRL+C to stop all background processes

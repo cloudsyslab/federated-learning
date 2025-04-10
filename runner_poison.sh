@@ -24,13 +24,13 @@ fi
 
 # start server
 if [[ "$defense" == "ours" ]]; then
-    python server.py --data "$data" --pattern "$pattern" --percentile True &
+    python server.py --data "$data" --pattern "$pattern" --percentile True --num_agents 10 &
 elif [[ "$defense" == "nodefense" ]]; then
-    python server.py --data "$data" --pattern "$pattern" &
+    python server.py --data "$data" --pattern "$pattern" --num_agents 10 &
 elif [[ "$defense" == "rlr" ]]; then
-    python server.py --data "$data" --pattern "$pattern" --UTDDetect True &
+    python server.py --data "$data" --pattern "$pattern" --UTDDetect True --num_agents 10 &
 elif [[ "$defense" == "oracle" ]]; then
-    python server.py --data "$data" --pattern "$pattern" --perfect True &
+    python server.py --data "$data" --pattern "$pattern" --perfect True --num_agents 10 &
 else
     echo "incorrect option"
     exit 1
@@ -39,24 +39,24 @@ fi
 sleep 10
 
 echo "Starting client 0 with poisoning"
-python client.py --clientID 0 --data "$data" --use_cuda True --device "cuda:4" --poison POISON --pattern "$pattern" &
+python client.py --clientID 0 --data "$data" --use_cuda True --device "cuda:4" --poison POISON --pattern "$pattern" --num_agents 10 &
 
 
 for i in `seq 1 3`; do
     echo "Starting client $i"
-    python client.py --clientID $i --data "$data" --use_cuda True --device "cuda:0" &
+    python client.py --clientID $i --data "$data" --use_cuda True --device "cuda:0" --num_agents 10 &
 done
 
 
 for i in `seq 4 6`; do
     echo "Starting client $i"
-    python client.py --clientID $i --data "$data" --use_cuda True --device "cuda:1"  &
+    python client.py --clientID $i --data "$data" --use_cuda True --device "cuda:1" --num_agents 10 &
 done
 
 
 for i in `seq 7 9`; do
     echo "Starting client $i"
-    python client.py --clientID $i --data "$data" --use_cuda True --device "cuda:2" &
+    python client.py --clientID $i --data "$data" --use_cuda True --device "cuda:2" --num_agents 10 &
 done
 
 # Enable CTRL+C to stop all background processes

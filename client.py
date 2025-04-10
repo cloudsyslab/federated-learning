@@ -257,10 +257,18 @@ def main() -> None:
         help="Used to select trojan pattern"
     )
 
+    parser.add_argument(
+        "--num_agents",
+        type=int,
+        default=10,
+        required=True,
+        help="Used to distribute training data among clients/agents"
+    )
+    
     args = parser.parse_args()
     
     print ("device=", args.device)
-
+    print ("pattern=", args.pattern)
     device = torch.device(
         args.device if torch.cuda.is_available() and args.use_cuda else "cpu"
     )
@@ -283,17 +291,12 @@ def main() -> None:
         trainset, testset, num_examples = utils.load_data(args.data)
 
         #split the dataset into slices and store the slices in user_groups
-        if args.data != "fedmnist":
-            if "distributed" not in args.pattern:
-                user_groups = utils.distribute_data(trainset)
-            else:
-                user_groups = utils.distribute_data(trainset, 40, 10, 10)
+        if args.data == "fedmnist" or args.data == "cifar10" or args.data == "fmnist":
+            user_groups = utils.distribute_data(trainset, args.num_agents, 10, 10)
+        else:
+            print ('unknown dataset')
+            exit(1)
 
-        #print(str(user_groups))
-        #DEBUG: distributed backdoor
-        if len(user_groups[args.clientID]) == 0:
-            print ('DEBUG:..............................\n', args.clientID)
-        
         #Use the client's ID to select which slice of the data to use
         if(args.data != "fedmnist"):
             trainset = utils.DatasetSplit(trainset, user_groups[args.clientID])
@@ -313,7 +316,7 @@ def main() -> None:
         # Start Flower client
         client = CifarClient(trainset, testset, device)
 
-        fl.client.start_numpy_client(server_address="10.100.116.10:8080", client=client)
+        fl.client.start_numpy_client(server_address="localhost:8080", client=client)
 
 
 if __name__ == "__main__":

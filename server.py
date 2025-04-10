@@ -1168,6 +1168,13 @@ def main():
         required=False,
         help="Used to select trojan pattern"
     )
+    parser.add_argument(
+        "--num_agents",
+        type=int,
+        default=10,
+        required=True,
+        help="number of agents participating in federated learning"
+    )
     args = parser.parse_args()
 
     global selectedDataset 
@@ -1260,16 +1267,8 @@ def main():
     model_parameters = [val.cpu().numpy() for _, val in model.state_dict().items()]
 
     # Create strategy
-    if selectedDataset == "fedmnist":
-        num_agents = 33
-    elif 'distributed' in selectedPattern: 
-        num_agents = 40
-        print ('num_agents :', num_agents)
-    else:
-        num_agents = 10
+    num_agents = args.num_agents
     
-    # debugging with 2 agents
-    #num_agents = 2
     '''
     strategy = fl.server.strategy.FedAvg(
         min_fit_clients=num_agents,
@@ -1297,7 +1296,7 @@ def main():
     
     # Start Flower server for four rounds of federated learning
     fl.server.start_server(
-        server_address="10.100.116.10:8080",
+        server_address="localhost:8080",
         config=fl.server.ServerConfig(num_rounds=10),
         strategy=strategy,
     )
