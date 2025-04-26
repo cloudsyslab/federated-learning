@@ -69,7 +69,8 @@ class CifarClient(fl.client.NumPyClient):
             self.trainset = torch.load(f'./dataset/Fed_MNIST/user_trainsets/user_{id_list[clientID]}_trainset.pt')
             if(int(id_list[clientID]) < 338):
                 print("POISONING MY DATA")
-                utils.poison_dataset(self.trainset, selectedDataset, None, id_list[clientID])
+                #utils.poison_dataset(self.trainset, selectedDataset, None, id_list[clientID])
+                utils.poison_dataset(self.trainset, selectedDataset, pattern=selectedPattern)
             clientID_local = int(id_list[clientID])
         
         #valset = torch.utils.data.Subset(self.trainset, range(0, n_valset))
@@ -282,6 +283,7 @@ def main() -> None:
         seed_everything(42)
         global selectedDataset
         global clientID
+        global selectedPattern
         selectedDataset = args.data
         clientID = args.clientID
         selectedPattern = args.pattern
@@ -291,8 +293,10 @@ def main() -> None:
         trainset, testset, num_examples = utils.load_data(args.data)
 
         #split the dataset into slices and store the slices in user_groups
-        if args.data == "fedmnist" or args.data == "cifar10" or args.data == "fmnist":
+        if args.data == "cifar10" or args.data == "fmnist":
             user_groups = utils.distribute_data(trainset, args.num_agents, 10, 10)
+        elif args.data == 'fedmnist':
+            pass
         else:
             print ('unknown dataset')
             exit(1)
@@ -304,8 +308,9 @@ def main() -> None:
             trainset = torch.load(f'./dataset/Fed_MNIST/user_trainsets/user_{clientID}_trainset.pt')
         
         #Poison the data if the poison option is selected
-        if args.poison and args.data != "fedmnist":
+        if args.poison and selectedDataset != "fedmnist":
             print(".........poisoning the data")
+            # fedmnist is poisoned inside fit function
             #idxs = (trainset.targets == 5).nonzero().flatten().tolist()
             utils.poison_dataset(trainset.dataset, selectedDataset, user_groups[args.clientID], agent_idx=args.clientID, pattern=selectedPattern)
 

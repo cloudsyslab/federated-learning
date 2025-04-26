@@ -39,7 +39,13 @@ def get_on_fit_config_fn():
         new_list = ""
         if selectedDataset == "fedmnist":
             #id_list = np.random.choice(3383, math.floor(3383*.01), replace=False)
-            id_list = np.random.choice(3383, 33, replace=False)
+            np.random.seed(42)
+            #id_list = np.random.choice(3383, 33, replace=False)
+            id_list_malicious = np.random.choice(338, 4, replace=False)
+            population = np.arange(338, 3383 + 1)
+            id_list_benign = np.random.choice(population, 29, replace=False)
+            id_list = np.concatenate((id_list_malicious, id_list_benign))
+
             #print("ID list:")
             #print(id_list)
             #The ID list has to be converted to a string because Flower won't except a list as a config option
@@ -102,7 +108,7 @@ def get_evaluate_fn(model: torch.nn.Module, toy: bool, data, selectedPattern):
             #poisoned_valset = copy.deepcopy(testset)
             idxs = (testset.targets == 5).nonzero().flatten().tolist()
             poisoned_valset = utils.DatasetSplit(copy.deepcopy(testset), idxs)
-            utils.poison_dataset(poisoned_valset.dataset, selectedDataset, idxs, poison_all=True, pattern=selectedPattern)
+            utils.poison_dataset(poisoned_valset.dataset, "fedmnist", idxs, poison_all=True, pattern=selectedPattern)
 
     if(selectedDataset == "cifar10" or selectedDataset == "fmnist"):
         valLoader = DataLoader(testset, batch_size=256, shuffle=False)
@@ -448,7 +454,14 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
             selectedClients = []
             for proxy, client in results:
                 selectedClients.append(client.metrics["clientID"])
-                if(client.metrics["clientID"] > 0):
+                if selectedPattern == 'plus_distributed':
+                    malicious_id = 4
+                elif selectedDataset == 'fedmnist':
+                    malicious_id = 338
+                else:
+                    malicious_id = 1
+
+                if client.metrics["clientID"] > malicious_id - 1:
                     #print("Client {} is not marked as malicious".format(client.metrics["clientID"]))
                     new_results.append((proxy, client))
             
@@ -747,9 +760,12 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
             true_positives = []
             false_negatives = []
             malicious_id = 1
-            if selectedDataset == 'fedmnist' or selectedPattern == 'plus_distributed':
+            if selectedPattern == 'plus_distributed':
                 malicious_id = 4
 
+            if selectedDataset == 'fedmnist':
+                malicious_id = 338
+            
             for value in predicted_malicious:
                 if(value < malicious_id):
                     true_positives.append(value)
@@ -801,19 +817,30 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
             #full_model = df.to_csv('Round1_fmnist_full_client_models.csv', index=False)
             detection_slice = df.tail(10).reset_index(drop=True)
             #round_values = detection_slice.to_csv('testsForPaperGraphs/fmnist_testing/percentile/cluster_visualization/test1/Round{}_kmeans_detection_slice.csv'.format(server_round), index=False)
-            predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset)
+            #predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset)
+            
+            predicted_benign, predicted_malicious, clients, malicious = percentileDetection.percentileDetection(detection_slice, selectedDataset,self.p1,self.p2,self.p3,self.p4)
             
             false_positives = []
             true_positives = []
             false_negatives = []
+            
+            malicious_id = 1
+            if selectedPattern == 'plus_distributed':
+                malicious_id = 4
+
+            if selectedDataset == 'fedmnist':
+                malicious_id = 338
+            
             for value in predicted_malicious:
-                if(value < 1):
+                if(value < malicious_id):
                     true_positives.append(value)
                 else:
                     false_positives.append(value)
             for value in malicious:
                 if(value not in predicted_malicious):
                     false_negatives.append(value)
+
             predicted_list = []
             for value in predicted_malicious:
                 predicted_list.append(value)
@@ -966,18 +993,11 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
             aggregated_accuracy = 0
 
         #Save the aggregated client training accuracies to the output file
-        if(selectedDataset == "cifar10"):
-            with open(filename, "a") as f:
-                print("Round {} aggregated training accuracy: {}".format(str(server_round), aggregated_accuracy), file=f)
-                print("Round {} aggregated poison accuracy: {}".format(str(server_round), aggregated_poison_accuracy), file=f)
+        with open(filename, "a") as f:
+            print("Round {} aggregated training accuracy: {}".format(str(server_round), aggregated_accuracy), file=f)
+            print("Round {} aggregated poison accuracy: {}".format(str(server_round), aggregated_poison_accuracy), file=f)
+            if percentile:
                 print(f"Using percentile thresholds: p1={self.p1}, p2={self.p2}, p3={self.p3}, p4={self.p4}", file=f)
-
-        else:
-            with open(filename, "a") as f:
-                print("Round {} aggregated training accuracy: {}".format(str(server_round), aggregated_accuracy), file=f)
-                print("Round {} aggregated poison accuracy: {}".format(str(server_round), aggregated_poison_accuracy), file=f)
-                print(f"Using percentile thresholds: p1={self.p1}, p2={self.p2}, p3={self.p3}, p4={self.p4}", file=f)
-
 
         # Return aggregated model paramters and other metrics (i.e., aggregated accuracy)
         return ndarrays_to_parameters(weights_prime), {"accuracy": aggregated_accuracy}

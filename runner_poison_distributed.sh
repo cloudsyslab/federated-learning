@@ -31,8 +31,6 @@ elif [[ "$defense" == "rlr" ]]; then
     python server.py --data "$data" --pattern "$pattern" --UTDDetect True --num_agents 40 &
 elif [[ "$defense" == "oracle" ]]; then
     python server.py --data "$data" --pattern "$pattern" --perfect True --num_agents 40 &
-    echo "incorrect option"
-    exit 1
 fi
 
 sleep 10
