@@ -873,8 +873,8 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
                 newClientIDs.append(client.metrics["clientID"])
 
             #compute RLR based on the updated update dictionary
-            #lr_vector = compute_robustLR(new_update_dict, len(new_update_dict.keys())*.25)
-            lr_vector = compute_robustLR(new_update_dict, 7)
+            lr_vector = compute_robustLR(new_update_dict, len(new_update_dict.keys())*.25)
+            #lr_vector = compute_robustLR(new_update_dict, 7)
             print("LR vector based on kmeans hybrid method:")
             print(lr_vector)
             if len(new_results) > 0:
