@@ -1,3 +1,4 @@
+import os
 import utils
 from torch.utils.data import DataLoader
 import torchvision.datasets
@@ -305,6 +306,7 @@ def main() -> None:
         if(args.data != "fedmnist"):
             trainset = utils.DatasetSplit(trainset, user_groups[args.clientID])
         else: # fedmnist is handled differently. 
+            print(f"Current working directory: {os.getcwd()}")
             trainset = torch.load(f'./dataset/Fed_MNIST/user_trainsets/user_{clientID}_trainset.pt')
         
         #Poison the data if the poison option is selected

@@ -119,3 +119,8 @@ for (( i=24; i<33; i++ )); do
 done
 
 echo "--- All ${TOTAL_CLIENTS} clients launched ---"
+# Enable CTRL+C to stop all background processes
+trap "trap - SIGTERM && kill -- -$$" SIGINT SIGTERM
+# Wait for all background processes to complete
+wait
+
