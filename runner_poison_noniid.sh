@@ -2,9 +2,6 @@
 set -e
 cd "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/
 
-# Download the CIFAR-10 dataset
-python -c "from torchvision.datasets import CIFAR10; CIFAR10('./dataset', download=True)"
-
 # Check if the required arguments are provided
 if [ "$#" -ne 2 ]; then
     echo "Usage: $0 <pattern> <defense technique>"
@@ -39,8 +36,21 @@ else
     exit 1
 fi
 
-sleep 10
+#sleep 10
 
+echo "Waiting for server to be ready..."
+
+SERVER_HOST="localhost"
+SERVER_PORT=8080
+
+for i in {1..30}; do
+    if nc -z "$SERVER_HOST" "$SERVER_PORT"; then
+        echo "Server is up!"
+        break
+    fi
+    echo "Server not ready yet, retrying in 1 second..."
+    sleep 1
+done
 
 # --- Configuration ---
 TOTAL_CLIENTS=33
@@ -73,7 +83,7 @@ done
 # We need to launch 29 normal clients. Let's split them: 10, 10, 9
 
 echo "--- Starting 10 Normal Clients on ${NORMAL_GPU_1} ---"
-for (( i=0; i<10; i++ )); do
+for (( i=4; i<14; i++ )); do
     clientID=$i
     echo "Starting normal client ${clientID}"
     python client.py \
@@ -85,7 +95,7 @@ for (( i=0; i<10; i++ )); do
 done
 
 echo "--- Starting 10 Normal Clients on ${NORMAL_GPU_2} ---"
-for (( i=10; i<20; i++ )); do
+for (( i=14; i<24; i++ )); do
     clientID=$i
     echo "Starting normal client ${clientID}"
     python client.py \
@@ -97,7 +107,7 @@ for (( i=10; i<20; i++ )); do
 done
 
 echo "--- Starting 9 Normal Clients on ${NORMAL_GPU_3} ---"
-for (( i=20; i<29; i++ )); do
+for (( i=24; i<33; i++ )); do
     clientID=$i
     echo "Starting normal client ${clientID}"
     python client.py \
