@@ -1047,7 +1047,8 @@ def compute_robustLR(agent_updates_dict, threshold):
 
 def main():
 
-    p1,p2,p3,p4 = 25,75,75,75
+    #p1,p2,p3,p4 = 25,75,75,75
+    p1,p2,p3,p4 = 75,50,50,50
     """Load model for
     1. server-side parameter initialization
     2. server-side parameter evaluation
