@@ -40,10 +40,14 @@ def get_on_fit_config_fn():
         if selectedDataset == "fedmnist":
             #id_list = np.random.choice(3383, math.floor(3383*.01), replace=False)
             np.random.seed(42)
-            #id_list = np.random.choice(3383, 33, replace=False)
-            id_list_malicious = np.random.choice(338, 4, replace=False)
+            #id_list_malicious = np.random.choice(338, 4, replace=False)
+            # for 30% attack ratio
+            id_list_malicious = np.random.choice(338, 10, replace=False)
+
             population = np.arange(338, 3383 + 1)
-            id_list_benign = np.random.choice(population, 29, replace=False)
+            #id_list_benign = np.random.choice(population, 29, replace=False)
+            # for 30% attack ratio
+            id_list_benign = np.random.choice(population, 23, replace=False)
             id_list = np.concatenate((id_list_malicious, id_list_benign))
 
             #print("ID list:")
