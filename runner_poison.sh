@@ -36,7 +36,20 @@ else
     exit 1
 fi
 
-sleep 10
+#sleep 10
+echo "Waiting for server to be ready..."
+
+SERVER_HOST="localhost"
+SERVER_PORT=8080
+
+for i in {1..30}; do
+    if nc -z "$SERVER_HOST" "$SERVER_PORT"; then
+        echo "Server is up!"
+        break
+    fi
+    echo "Server not ready yet, retrying in 1 second..."
+    sleep 1
+done
 
 echo "Starting client 0 with poisoning"
 python client.py --clientID 0 --data "$data" --use_cuda True --device "cuda:4" --poison POISON --pattern "$pattern" --num_agents 10 &

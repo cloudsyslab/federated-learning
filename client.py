@@ -25,19 +25,24 @@ class CifarClient(fl.client.NumPyClient):
         trainset: torchvision.datasets,
         testset: torchvision.datasets,
         device: str,
+        model: str, 
         validation_split: int = 0.1,
     ):
         self.device = device
         self.trainset = trainset
         self.testset = testset
         self.validation_split = validation_split
+        self.model = model
 
     def set_parameters(self, parameters):
         """Loads a CNN model and replaces it parameters with the ones
         given."""
         #print("Params: " + str(parameters))
         if(selectedDataset == 'cifar10'):
-            model = utils.Net()
+            if self.model == 'convnet':
+                model = utils.Net()   #AlexNet
+            else:
+                model = utils.ResNet9(3,10)   #ResNet
         else:
             model = utils.CNN_MNIST()
         params_dict = zip(model.state_dict().keys(), parameters)
@@ -267,6 +272,14 @@ def main() -> None:
         help="Used to distribute training data among clients/agents"
     )
     
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="convnet",
+        required=True,
+        help="choosing convnet vs other dnn architectures such as resnet"
+    )
+    
     args = parser.parse_args()
     
     print ("device=", args.device)
@@ -321,7 +334,7 @@ def main() -> None:
             testset = torch.utils.data.Subset(testset, range(10))
 
         # Start Flower client
-        client = CifarClient(trainset, testset, device)
+        client = CifarClient(trainset, testset, device, args.model)
 
         fl.client.start_numpy_client(server_address="localhost:8080", client=client)
 

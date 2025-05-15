@@ -83,7 +83,7 @@ def conv_block(in_channels, out_channels, pool=False, track_running_stats=False)
 
 
 class ResNet9(nn.Module):
-    def __init__(self, in_channels, num_classes, args):
+    def __init__(self, in_channels, num_classes):
         super().__init__()
 
         self.conv1 = conv_block(
@@ -98,7 +98,7 @@ class ResNet9(nn.Module):
         self.res2 = nn.Sequential(conv_block(512, 512), conv_block(512, 512))
 
         self.classifier = nn.Sequential(
-            nn.MaxPool2d(4), nn.Flatten(), nn.Linear(512, num_classes, bias=False)
+            nn.MaxPool2d(4), nn.Flatten(), nn.Linear(512, num_classes, bias=True) #bias is false in cvpr25 paper
         )
 
     def forward(self, xb):

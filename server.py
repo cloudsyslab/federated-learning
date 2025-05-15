@@ -159,11 +159,12 @@ def get_evaluate_fn(model: torch.nn.Module, toy: bool, data, selectedPattern):
     return evaluate
 
 class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg): 
-    def __init__(self, *args, p1, p2, p3, p4, **kwargs):
+    def __init__(self, *args, p1, p2, p3, p4, model, **kwargs):
         self.p1 = p1
         self.p2 = p2
         self.p3 = p3
         self.p4 = p4 
+        self.model = model
 
         self.server_learning_rate = kwargs.pop('server_learning_rate', 0.01)
         super().__init__(*args, **kwargs)
@@ -219,7 +220,10 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
 
             #select the correct model for the selected dataset
             if selectedDataset == "cifar10":
-                model = utils.Net()
+                if self.model == 'convnet':
+                    model = utils.Net()   #AlexNet
+                else:
+                    model = utils.ResNet9(3,10)   #ResNet
             else:
                 model = utils.CNN_MNIST()
 
@@ -928,7 +932,10 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
 
         #load the correct model
         if selectedDataset == "cifar10":
-            model = utils.Net()
+            if self.model == 'convnet':
+                model = utils.Net()   #AlexNet
+            else:
+                model = utils.ResNet9(3,10)   #ResNet
         else:
             model = utils.CNN_MNIST()
 
@@ -1201,6 +1208,16 @@ def main():
         required=True,
         help="number of agents participating in federated learning"
     )
+
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="convnet",
+        required=True,
+        help="choosing convnet vs other dnn architectures such as resnet"
+    )
+
+
     args = parser.parse_args()
 
     global selectedDataset 
@@ -1256,8 +1273,10 @@ def main():
         defense = 'oracle_'
 
     if(args.data == "cifar10"):
-        model = utils.Net()
-        #model = utils.CNN_MNIST()
+        if args.model == 'convnet':
+            model = utils.Net()   #AlexNet
+        else:
+            model = utils.ResNet9(3,10)   #ResNet
         ct = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         directory = Path("results/cifar10")
         # Create the directory, including parent directories if needed
@@ -1319,7 +1338,8 @@ def main():
         server_learning_rate = 1,
         #server_momentum = 0,
         initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
-        p1=p1,p2=p2,p3=p3,p4=p4
+        p1=p1,p2=p2,p3=p3,p4=p4,
+        model=args.model
     )
     
     # Start Flower server for four rounds of federated learning
