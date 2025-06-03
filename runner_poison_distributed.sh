@@ -25,6 +25,8 @@ fi
 # start server
 if [[ "$defense" == "ours" ]]; then
     python server.py --data "$data" --pattern "$pattern" --percentile True --num_agents 40 &
+elif [[ "$defense" == "ours_hybrid" ]]; then
+    python server.py --data "$data" --pattern "$pattern" --percentileHybrid True --num_agents 40 &
 elif [[ "$defense" == "nodefense" ]]; then
     python server.py --data "$data" --pattern "$pattern" --num_agents 40 &
 elif [[ "$defense" == "rlr" ]]; then
@@ -33,7 +35,19 @@ elif [[ "$defense" == "oracle" ]]; then
     python server.py --data "$data" --pattern "$pattern" --perfect True --num_agents 40 &
 fi
 
-sleep 10
+echo "Waiting for server to be ready..."
+
+SERVER_HOST="localhost"
+SERVER_PORT=8080
+
+for i in {1..30}; do
+    if nc -z "$SERVER_HOST" "$SERVER_PORT"; then
+        echo "Server is up!"
+        break
+    fi
+    echo "Server not ready yet, retrying in 1 second..."
+    sleep 1
+done
 
 #Start the poisoned clients
 for i in `seq 0 3`; do
