@@ -880,15 +880,15 @@ class AggregateCustomMetricStrategy(fl.server.strategy.FedAvg):
             for proxy, client in new_results:
                 newClientIDs.append(client.metrics["clientID"])
 
+            if not new_update_dict: # Check if all clients were filtered
+                print("PercentileHybrid defense filtered all clients. No clients left for RLR. Skipping round aggregation.")
+                return None, {} 
             #compute RLR based on the updated update dictionary
             lr_vector = compute_robustLR(new_update_dict, len(new_update_dict.keys())*.25)
             #lr_vector = compute_robustLR(new_update_dict, 7)
             print("LR vector based on kmeans hybrid method:")
             print(lr_vector)
-            if len(new_results) > 0:
-                results = new_results
-            else:
-                return None, {}
+            results = new_results
          
         #UTD RLR method
         if UTDDetect:
