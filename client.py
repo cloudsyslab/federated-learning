@@ -276,7 +276,6 @@ def main() -> None:
         "--model",
         type=str,
         default="convnet",
-        required=True,
         help="choosing convnet vs other dnn architectures such as resnet"
     )
     
